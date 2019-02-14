@@ -8,7 +8,8 @@ import tensorflow as tf
 
 from tfrecord_utils import _process_image_withoutcoder, _convert_to_example_simple
 
-
+#此方法把主要train_PNet_landmark.txt中的内容通过tfrecord_writer进行存储
+#存储内容有label、roi、landmark
 def _add_to_tfrecord(filename, image_example, tfrecord_writer):
     """Loads data from image and annotations files and add them to a TFRecord.
 
@@ -22,6 +23,7 @@ def _add_to_tfrecord(filename, image_example, tfrecord_writer):
     #height:original image's height
     #width:original image's width
     #image_example dict contains image's info
+    #主要用来获取图片的高和宽
     image_data, height, width = _process_image_withoutcoder(filename)
     example = _convert_to_example_simple(image_example, image_data)
     tfrecord_writer.write(example.SerializeToString())
@@ -73,7 +75,10 @@ def run(dataset_dir, net, output_dir, name='MTCNN', shuffling=False):
     # dataset_utils.write_label_file(labels_to_class_names, dataset_dir)
     print('\nFinished converting the MTCNN dataset!')
 
-
+#此函数主要用来生成三个字典类型的数据
+#data_example['filename'] = info[0]
+#data_example['label'] = int(info[1])
+#data_example['bbox'] = bbox
 def get_dataset(dir, net='PNet'):
     #get file name , label and anotation
     #item = 'imglists/PNet/train_%s_raw.txt' % net

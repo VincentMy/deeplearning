@@ -7,11 +7,11 @@ import numpy as np
 import tensorflow as tf
 from tensorboard.plugins import projector
 
-from train_models.MTCNN_config import config
+from MTCNN_config import config
 
 sys.path.append("../prepare_data")
 print(sys.path)
-from prepare_data.read_tfrecord_v2 import read_multi_tfrecords,read_single_tfrecord
+from read_tfrecord_v2 import read_multi_tfrecords,read_single_tfrecord
 
 import random
 import cv2
@@ -108,11 +108,12 @@ def train(net_factory, prefix, end_epoch, base_dir,
     :param base_lr:
     :return:
     """
+    #net = PNet
     net = prefix.split('/')[-1]
     #label file
     label_file = os.path.join(base_dir,'train_%s_landmark.txt' % net)
     #label_file = os.path.join(base_dir,'landmark_12_few.txt')
-    print(label_file)
+    #print(label_file)
     f = open(label_file, 'r')
     # get number of training examples
     num = len(f.readlines())
@@ -124,7 +125,8 @@ def train(net_factory, prefix, end_epoch, base_dir,
         #dataset_dir = os.path.join(base_dir,'train_%s_ALL.tfrecord_shuffle' % net)
         dataset_dir = os.path.join(base_dir,'train_%s_landmark.tfrecord_shuffle' % net)
         print('dataset dir is:',dataset_dir)
-        #从tfrecord中读取信息
+        #从tfrecord中读取信息，返回存储的image、label、roi、landmark信息，不过这些信息是按照batch_size大小取的
+        #其中image存储的时候是按照tostring的方式存的，取的时候进行了转码
         image_batch, label_batch, bbox_batch,landmark_batch = read_single_tfrecord(dataset_dir, config.BATCH_SIZE, net)
         
     #RNet use 3 tfrecords to get data    
@@ -178,6 +180,7 @@ def train(net_factory, prefix, end_epoch, base_dir,
 
 
     #save model
+    #max_to_keep=0表示每训练一代(epoch)就保存一次模型
     saver = tf.train.Saver(max_to_keep=0)
     sess.run(init)
 
@@ -191,8 +194,11 @@ def train(net_factory, prefix, end_epoch, base_dir,
     logs_dir = "../logs/%s" %(net)
     if os.path.exists(logs_dir) == False:
         os.mkdir(logs_dir)
+    #定义日志文件writer
     writer = tf.summary.FileWriter(logs_dir,sess.graph)
+    #ProjectorConfig帮助生成日志文件
     projector_config = projector.ProjectorConfig()
+    #将projector的内容写入日志文件
     projector.visualize_embeddings(writer,projector_config)
     #begin 
     coord = tf.train.Coordinator()
@@ -204,11 +210,9 @@ def train(net_factory, prefix, end_epoch, base_dir,
     epoch = 0
     sess.graph.finalize()
     try:
-
-
-
         for step in range(MAX_STEP):
             i = i + 1
+            #此方法用来判断是否需要结束
             if coord.should_stop():
                 break
             image_batch_array, label_batch_array, bbox_batch_array,landmark_batch_array = sess.run([image_batch, label_batch, bbox_batch,landmark_batch])

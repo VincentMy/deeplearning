@@ -40,6 +40,7 @@ def read_single_tfrecord(tfrecord_file, batch_size, net):
     label = tf.cast(image_features['image/label'], tf.float32)
     roi = tf.cast(image_features['image/roi'],tf.float32)
     landmark = tf.cast(image_features['image/landmark'],tf.float32)
+    #返回batch大小的数据
     image, label,roi,landmark = tf.train.batch(
         [image, label,roi,landmark],
         batch_size=batch_size,

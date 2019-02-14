@@ -27,6 +27,7 @@ def cls_ohem(cls_prob, label):
     #label=-1 --> label=0net_factory
 
     #pos -> 1, neg -> 0, others -> 0
+    #当tf.less(label,0)为ture时，返回zeros，否则,返回label
     label_filter_invalid = tf.where(tf.less(label,0), zeros, label)
     num_cls_prob = tf.size(cls_prob)
     cls_prob_reshape = tf.reshape(cls_prob,[num_cls_prob,-1])
