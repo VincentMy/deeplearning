@@ -22,6 +22,7 @@ def dense_to_one_hot(labels_dense,num_classes):
 #label:batch
 
 def cls_ohem(cls_prob, label):
+
     #生成一个label大小的0矩阵
     zeros = tf.zeros_like(label)
     #label=-1 --> label=0net_factory
@@ -36,19 +37,32 @@ def cls_ohem(cls_prob, label):
     num_row = tf.to_int32(cls_prob.get_shape()[0])
     #row = [0,2,4.....]
     row = tf.range(num_row)*2
+    #表示当indices为单数时，表示脸部正例，当为单数时，表示为脸部负例
     indices_ = row + label_int
+    #tf.gather(a,b)表示a按照b的索引顺序排列
+    #此处的tf.gather()表示cls_prob_reshape按照indices_索引取数，分别取出对应的概率
+    #表示正确分类的概率值
+    #label_prob.shape = (384) ,其中每一位数，代表了其正确分类的概率
     label_prob = tf.squeeze(tf.gather(cls_prob_reshape, indices_))
+    #-tf.log(label_prob)表示的是log(p),其中的1e-10代表了10^(-10)=0.0000000001。主要是为了防止为0
     loss = -tf.log(label_prob+1e-10)
     zeros = tf.zeros_like(label_prob, dtype=tf.float32)
     ones = tf.ones_like(label_prob,dtype=tf.float32)
     # set pos and neg to be 1, rest to be 0
+    # 因为face detection 中用到的数据是negatives + positives
+    # 我们只需要正例和负例，并且在label_prob中，我们都已经给出了正例和负例的相关概率，所以对应的label设置为1
+    # 对于其他事例我们把其label设置为0
     valid_inds = tf.where(label < zeros,zeros,ones)
     # get the number of POS and NEG examples
+    # 计算正例和负例的总数
     num_valid = tf.reduce_sum(valid_inds)
-
+    #num_keep_radio=0.7
     keep_num = tf.cast(num_valid*num_keep_radio,dtype=tf.int32)
     #FILTER OUT PART AND LANDMARK DATA
+    #这个交叉熵损失函数所用的事例是正例和负例，其他事例因为label所对应的值为0，所以不影响计算
     loss = loss * valid_inds
+    #tf.nn.top_k(a,k)如果a是一维：表示返回a中前k个最大值，如果a是多维：表示返回每一行中的前k个最大值
+    #此处表示返回前70%的损失函值
     loss,_ = tf.nn.top_k(loss, k=keep_num)
     return tf.reduce_mean(loss)
 
@@ -82,21 +96,29 @@ def bbox_ohem_orginal(bbox_pred,bbox_target,label):
     return tf.reduce_mean(square_error)
 
 #label=1 or label=-1 then do regression
+#bounding box regression 用 positives + part faces
+# bbox_pred 表示网络训练得出的结果batch*4
+# bbox_target表示目标bbox的实际未知信息
 def bbox_ohem(bbox_pred,bbox_target,label):
     '''
-
+    
     :param bbox_pred:
     :param bbox_target:
     :param label: class label
     :return: mean euclidean loss for all the pos and part examples
     '''
+    #label.shape = (384,)
     zeros_index = tf.zeros_like(label, dtype=tf.float32)
     ones_index = tf.ones_like(label,dtype=tf.float32)
     # keep pos and part examples
+    #如果label的值为1或-1时，结果为ones_index,否则为zeros_index
+    #因为1表示正例，-1表示part，这两部分都有人脸。所以可以找到具体的坐标位置
     valid_inds = tf.where(tf.equal(tf.abs(label), 1),ones_index,zeros_index)
     #(batch,)
     #calculate square sum
+    #计算距离的平方差
     square_error = tf.square(bbox_pred-bbox_target)
+    #
     square_error = tf.reduce_sum(square_error,axis=1)
     #keep_num scalar
     num_valid = tf.reduce_sum(valid_inds)
@@ -234,9 +256,12 @@ def P_Net(inputs,label=None,bbox_target=None,landmark_target=None,training=True)
             # calculate classification loss
             #tf.squeeze(t)表示默认删除所有为1的维度，而[1,2]表示只删除下标为1和2维的1
             cls_prob = tf.squeeze(conv4_1,[1,2],name='cls_prob')
+            #计算face classification的损失值
             cls_loss = cls_ohem(cls_prob,label)
             #batch
             # cal bounding box error, squared sum error
+            # 由于bbox_pred.shape = batch * 1 * 1 * 4,所以进行squeeze去掉下标为1，2的两个为1的维度
+            #squeeze后的bbox_pred维度为batch * 4
             bbox_pred = tf.squeeze(bbox_pred,[1,2],name='bbox_pred')
             bbox_loss = bbox_ohem(bbox_pred,bbox_target,label)
             #batch*10

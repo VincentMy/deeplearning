@@ -168,7 +168,7 @@ def train(net_factory, prefix, end_epoch, base_dir,
     landmark_target = tf.placeholder(tf.float32,shape=[config.BATCH_SIZE,10],name='landmark_target')
     #get loss and accuracy
     input_image = image_color_distort(input_image)
-    cls_loss_op,bbox_loss_op,landmark_loss_op,L2_loss_op,accuracy_op = net_factory(input_image, label, bbox_target,landmark_target,training=True)
+    cls_loss_op,bbox_loss_op,landmark_loss_op,L2_loss_op,accuracy_op= net_factory(input_image, label, bbox_target,landmark_target,training=True)
     #train,update learning rate(3 loss)
     total_loss_op  = radio_cls_loss*cls_loss_op + radio_bbox_loss*bbox_loss_op + radio_landmark_loss*landmark_loss_op + L2_loss_op
     train_op, lr_op = train_model(base_lr,
@@ -234,7 +234,7 @@ def train(net_factory, prefix, end_epoch, base_dir,
 
             if (step+1) % display == 0:
                 #acc = accuracy(cls_pred, labels_batch)
-                cls_loss, bbox_loss,landmark_loss,L2_loss,lr,acc = sess.run([cls_loss_op, bbox_loss_op,landmark_loss_op,L2_loss_op,lr_op,accuracy_op],
+                cls_loss, bbox_loss,landmark_loss,L2_loss,lr,acc= sess.run([cls_loss_op, bbox_loss_op,landmark_loss_op,L2_loss_op,lr_op,accuracy_op,conv4_1],
                                                              feed_dict={input_image: image_batch_array, label: label_batch_array, bbox_target: bbox_batch_array, landmark_target: landmark_batch_array})
 
                 total_loss = radio_cls_loss*cls_loss + radio_bbox_loss*bbox_loss + radio_landmark_loss*landmark_loss + L2_loss
