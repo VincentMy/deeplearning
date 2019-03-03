@@ -26,14 +26,18 @@ def train_model(base_lr, loss, data_num):
     """
     lr_factor = 0.1
     global_step = tf.Variable(0, trainable=False)
-    #LR_EPOCH [8,14]
+    #config.LR_EPOCH = [6,14,20]
     #boundaried [num_batch,num_batch]
+    #返回的数为boundaries: [22333, 52111, 74445]，用于下面在此下标下改变学习率
     boundaries = [int(epoch * data_num / config.BATCH_SIZE) for epoch in config.LR_EPOCH]
     #lr_values[0.01,0.001,0.0001,0.00001]
     lr_values = [base_lr * (lr_factor ** x) for x in range(0, len(config.LR_EPOCH) + 1)]
+    #lr_values: [0.01, 0.001, 0.00010000000000000002, 1.0000000000000003e-05]
     #control learning rate
     lr_op = tf.train.piecewise_constant(global_step, boundaries, lr_values)
+    #梯度动量法作为优化函数
     optimizer = tf.train.MomentumOptimizer(lr_op, 0.9)
+    #最小化损失函数
     train_op = optimizer.minimize(loss, global_step)
     return train_op, lr_op
 
@@ -65,7 +69,7 @@ def random_flip_images(image_batch,label_batch,landmark_batch):
         num_images = image_batch.shape[0]
         fliplandmarkindexes = np.where(label_batch==-2)[0]
         flipposindexes = np.where(label_batch==1)[0]
-        #only flip
+        #only flip,np.concatenate((a,b),axis=0)表示按照行进行组合
         flipindexes = np.concatenate((fliplandmarkindexes,flipposindexes))
         #random flip    
         for i in flipindexes:
@@ -96,6 +100,7 @@ def image_color_distort(inputs):
 #prefix = '../data/%s_model/PNet_landmark/PNet' % model_name
 #end_epoch = 30
 #base_dir = ../../DATA/imglists/PNet
+#lr = 0.001
 def train(net_factory, prefix, end_epoch, base_dir,
           display=200, base_lr=0.01):
     """
@@ -168,9 +173,13 @@ def train(net_factory, prefix, end_epoch, base_dir,
     landmark_target = tf.placeholder(tf.float32,shape=[config.BATCH_SIZE,10],name='landmark_target')
     #get loss and accuracy
     input_image = image_color_distort(input_image)
+    #此处返回的是PNET中分类损失函数，bounding box的损失函数，面部5个坐标点的损失函数，整体正则化loss函数，pos和neg分类的准确性
     cls_loss_op,bbox_loss_op,landmark_loss_op,L2_loss_op,accuracy_op= net_factory(input_image, label, bbox_target,landmark_target,training=True)
     #train,update learning rate(3 loss)
+    #将三个损失乘上各自的权重再加上正则化损失得到总损失
     total_loss_op  = radio_cls_loss*cls_loss_op + radio_bbox_loss*bbox_loss_op + radio_landmark_loss*landmark_loss_op + L2_loss_op
+    #base_lr=0.01表示的是基础学习率
+    #train_op表示最小化损失函数，lr_op表示在不同循环次数下的学习率
     train_op, lr_op = train_model(base_lr,
                                   total_loss_op,
                                   num)
@@ -208,6 +217,7 @@ def train(net_factory, prefix, end_epoch, base_dir,
     #total steps
     MAX_STEP = int(num / config.BATCH_SIZE + 1) * end_epoch
     epoch = 0
+    #防止内存溢出
     sess.graph.finalize()
     try:
         for step in range(MAX_STEP):
@@ -234,7 +244,7 @@ def train(net_factory, prefix, end_epoch, base_dir,
 
             if (step+1) % display == 0:
                 #acc = accuracy(cls_pred, labels_batch)
-                cls_loss, bbox_loss,landmark_loss,L2_loss,lr,acc= sess.run([cls_loss_op, bbox_loss_op,landmark_loss_op,L2_loss_op,lr_op,accuracy_op,conv4_1],
+                cls_loss, bbox_loss,landmark_loss,L2_loss,lr,acc= sess.run([cls_loss_op, bbox_loss_op,landmark_loss_op,L2_loss_op,lr_op,accuracy_op],
                                                              feed_dict={input_image: image_batch_array, label: label_batch_array, bbox_target: bbox_batch_array, landmark_target: landmark_batch_array})
 
                 total_loss = radio_cls_loss*cls_loss + radio_bbox_loss*bbox_loss + radio_landmark_loss*landmark_loss + L2_loss

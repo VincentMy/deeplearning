@@ -28,9 +28,17 @@ class FcnDetector(object):
             self.sess = tf.Session(config=tf.ConfigProto(allow_soft_placement=True, gpu_options=tf.GPUOptions(allow_growth=True)))
             saver = tf.train.Saver()
             #check whether the dictionary is valid
+            #model_dict: ../data/MTCNN_model/PNet_Landmark
+            #其中model_path.split('/')[:-1] = ['..', 'data', 'MTCNN_model', 'PNet_Landmark']
             model_dict = '/'.join(model_path.split('/')[:-1])
+            #print("model_dict:",model_dict) #model_dict: ../data/MTCNN_model/PNet_Landmark
+            #print("end:",end)
+            #去调用之前生成的checkpoint数据
             ckpt = tf.train.get_checkpoint_state(model_dict)
-            print(model_path)
+            #print("ckpt:",ckpt)#model_checkpoint_path: "../data/MTCNN_model/PNet_Landmark\\PNet-30" all_model_checkpoint_paths: "../data/MTCNN_model/PNet_Landmark\\PNet-30"
+            #print("end:",end)
+            #print(model_path)
+            #ckpt.model_checkpoint_path表示获取最新的checkpoint数据
             readstate = ckpt and ckpt.model_checkpoint_path
             assert  readstate, "the params dictionary is not valid"
             print("restore models' param")

@@ -5,8 +5,8 @@ import math
 from os.path import join, exists
 import cv2
 import numpy as np
-from prepare_data.BBox_utils import getDataFromTxt,processImage,shuffle_in_unison_scary,BBox
-from prepare_data.Landmark_utils import show_landmark,rotate,flip
+from BBox_utils import getDataFromTxt,processImage,shuffle_in_unison_scary,BBox
+from Landmark_utils import show_landmark,rotate,flip
 import random
 import tensorflow as tf
 import sys
@@ -57,7 +57,12 @@ def GenerateData(ftxt, output,net,argument=False):
         return
     image_id = 0
     f = open(join(OUTPUT,"landmark_%s_aug.txt" %(size)),'w')
-    data = getDataFromTxt(ftxt)
+    """
+    [(img_path, bbox, landmark)]
+            bbox: [left, right, top, bottom]
+            landmark: [(x1, y1), (x2, y2), ...]
+    """
+    data = getDataFromTxt(ftxt,".")
     idx = 0
     #image_path bbox landmark(5*2)
     for (imgPath, bbox, landmarkGt) in data:
@@ -69,16 +74,27 @@ def GenerateData(ftxt, output,net,argument=False):
         img_h,img_w,img_c = img.shape
         gt_box = np.array([bbox.left,bbox.top,bbox.right,bbox.bottom])
         f_face = img[bbox.top:bbox.bottom+1,bbox.left:bbox.right+1]
+        #cv2.imshow("image",f_face)
+        #cv2.waitKey(0)
+        #print("end:",end)
         f_face = cv2.resize(f_face,(size,size))
         landmark = np.zeros((5, 2))
         #normalize
+        #print("landmarkGt:",landmarkGt.shape)#landmarkGt: (5, 2)
+        #print("end:",end)
         for index, one in enumerate(landmarkGt):
+            #print("one:",one.shape)#one: (2,)
+            #print("gt_box:",gt_box[0])
+            #print("end:",end)
+            #(one[0]-x1)/(x2-x1),(one[1]-y1)/(y2-y1)
             rv = ((one[0]-gt_box[0])/(gt_box[2]-gt_box[0]), (one[1]-gt_box[1])/(gt_box[3]-gt_box[1]))
             landmark[index] = rv
         
         F_imgs.append(f_face)
         F_landmarks.append(landmark.reshape(10))
-        landmark = np.zeros((5, 2))        
+        landmark = np.zeros((5, 2))
+        #print("argument:",argument)#argument: True
+        #print("end:",end)        
         if argument:
             idx = idx + 1
             if idx % 100 == 0:
@@ -92,6 +108,7 @@ def GenerateData(ftxt, output,net,argument=False):
                 continue
             #random shift
             for i in range(10):
+                #pos and part face size [minsize*0.8, maxsize*1.25]
                 bbox_size = npr.randint(int(min(gt_w, gt_h) * 0.8), np.ceil(1.25 * max(gt_w, gt_h)))
                 delta_x = npr.randint(-gt_w * 0.2, gt_w * 0.2)
                 delta_y = npr.randint(-gt_h * 0.2, gt_h * 0.2)

@@ -1,7 +1,7 @@
 #coding:utf-8
 import sys
 #sys.path.append("../")
-from prepare_data.utils import convert_to_square
+from utils import convert_to_square
 
 sys.path.insert(0,'..')
 import numpy as np
@@ -11,18 +11,20 @@ import pickle as pickle
 import cv2
 from train_models.mtcnn_model import P_Net, R_Net, O_Net
 from train_models.MTCNN_config import config
-from prepare_data.loader import TestLoader
+from loader import TestLoader
 from Detection.detector import Detector
 from Detection.fcn_detector import FcnDetector
 from Detection.MtcnnDetector import MtcnnDetector
 from utils import *
-from prepare_data.data_utils import *
+from data_utils import *
 #net : 24(RNet)/48(ONet)
 #data: dict()
 def save_hard_example(net, data,save_path):
     # load ground truth from annotation file
     # format of each line: image/path [x1,y1,x2,y2] for each gt_box in this image
-
+    print("net:",net)#net: 24
+    print("save_path:",save_path)#save_path: ./no_LM24\ONet
+    #print("end:",end)
     im_idx_list = data['images']
     # print(images[0])
     gt_boxes_list = data['bboxes']
@@ -32,19 +34,21 @@ def save_hard_example(net, data,save_path):
 
     
     # save files
-    neg_label_file = "../../DATA/no_LM%d/neg_%d.txt" % (net, image_size)
+    neg_label_file = "./no_LM%d/neg_%d.txt" % (net, image_size)
     neg_file = open(neg_label_file, 'w')
 
-    pos_label_file = "../../DATA/no_LM%d/pos_%d.txt" % (net, image_size)
+    pos_label_file = "./no_LM%d/pos_%d.txt" % (net, image_size)
     pos_file = open(pos_label_file, 'w')
 
-    part_label_file = "../../DATA/no_LM%d/part_%d.txt" % (net, image_size)
+    part_label_file = "./no_LM%d/part_%d.txt" % (net, image_size)
     part_file = open(part_label_file, 'w')
     #read detect result
     det_boxes = pickle.load(open(os.path.join(save_path, 'detections.pkl'), 'rb'))
     # print(len(det_boxes), num_of_images)
-    print(len(det_boxes))
-    print(num_of_images)
+    print("det_boxes:",len(det_boxes))
+    print("num_of_images:",num_of_images)
+    print("end:",end)
+    #如果不相等，报错
     assert len(det_boxes) == num_of_images, "incorrect detections or ground truths"
 
     # index of neg, pos and part face, used as their image names
@@ -110,6 +114,7 @@ def save_hard_example(net, data,save_path):
                     save_file = get_path(pos_dir, "%s.jpg" % p_idx)
                     pos_file.write(save_file + ' 1 %.2f %.2f %.2f %.2f\n' % (
                         offset_x1, offset_y1, offset_x2, offset_y2))
+                    #保存图像
                     cv2.imwrite(save_file, resized_im)
                     p_idx += 1
 
@@ -131,14 +136,19 @@ def t_net(prefix, epoch,
     detectors = [None, None, None]
     print("Test model: ", test_mode)
     #PNet-echo
+    #model_path: ['../data/MTCNN_model/PNet_No_Landmark/PNet-18', '../data/MTCNN_model/RNet_No_Landmark/RNet-14', '../data/MTCNN_model/ONet_No_Landmark/ONet-16']
+    #后面跟的数字18表示循环次数
     model_path = ['%s-%s' % (x, y) for x, y in zip(prefix, epoch)]
-    print(model_path[0])
-    # load pnet model
+    #print("model_path:",model_path)
+    print(model_path[0]) #../data/MTCNN_model/PNet_Landmark/PNet-18
+    #print("slide_window:",slide_window)
+    #print("end:",end)
     if slide_window:
         PNet = Detector(P_Net, 12, batch_size[0], model_path[0])
     else:
         PNet = FcnDetector(P_Net, model_path[0])
     detectors[0] = PNet
+    #print("end:",end)
 
     # load rnet model
     if test_mode in ["RNet", "ONet"]:
@@ -152,11 +162,13 @@ def t_net(prefix, epoch,
         ONet = Detector(O_Net, 48, batch_size[2], model_path[2])
         detectors[2] = ONet
         
-    basedir = '../../DATA/'
-    #anno_file
+    basedir = '.'
+    #anno_file，文件中存放的是文件名和其中人脸的bbox
     filename = './wider_face_train_bbx_gt.txt'
     #read anotation(type:dict), include 'images' and 'bboxes'
     data = read_annotation(basedir,filename)
+    #print("data:",data['images'])
+    #print("end:",end)
     mtcnn_detector = MtcnnDetector(detectors=detectors, min_face_size=min_face_size,
                                    stride=stride, threshold=thresh, slide_window=slide_window)
     print("==================================")
@@ -164,11 +176,20 @@ def t_net(prefix, epoch,
     # imdb = IMDB("wider", image_set, root_path, dataset_path, 'test')
     # gt_imdb = imdb.gt_imdb()
     print('load test data')
+    #data['images']中存放的是images的路径
+    #test_data中data函数存放的是被cv2转换过的images,所以是image对应的矩阵
+    #print("data:",len(data['images'])) #data:12880
+    #print("end:",end)
     test_data = TestLoader(data['images'])
     print ('finish loading')
     #list
     print ('start detecting....')
+    #这个函数，主要是通过把原图img通过pnet进行预测，返回预测框bbox的具体坐标
+    #把pnet生成b映射到原图生成bbox_c，并进行nms计算，然后把结果放入rnet进行训练,生成bbox
+    #把rnet生成的bbox映射到原图，生成bbox_c，进行nms计算
+    #返回最后的计算结果bbox_c到detections
     detections,_ = mtcnn_detector.detect_face(test_data)
+    #print("end:",end)
     print ('finish detecting ')
     save_net = 'RNet'
     if test_mode == "PNet":
@@ -178,14 +199,19 @@ def t_net(prefix, epoch,
     #save detect result
     save_path = os.path.join(data_dir, save_net)
     print ('save_path is :')
-    print(save_path)
+    print(save_path)#./no_LM24\ONet
+    #print("end:",end)
     if not os.path.exists(save_path):
         os.mkdir(save_path)
 
     save_file = os.path.join(save_path, "detections.pkl")
     with open(save_file, 'wb') as f:
+        #dump将对象进行序列化，并进行保存到f中
         pickle.dump(detections, f,1)
     print("%s测试完成开始OHEM" % image_size)
+    print("image_size:",image_size)#24
+    print("save_path:",save_path)#./no_LM24\ONet
+    #print("end:",end)
     save_hard_example(image_size, data, save_path)
 
 
@@ -194,8 +220,14 @@ def parse_args():
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('--test_mode', dest='test_mode', help='test net type, can be pnet, rnet or onet',
                         default='RNet', type=str)
+    #前缀
+    """
     parser.add_argument('--prefix', dest='prefix', help='prefix of model name', nargs="+",
                         default=['../data/MTCNN_model/PNet_No_Landmark/PNet', '../data/MTCNN_model/RNet_No_Landmark/RNet', '../data/MTCNN_model/ONet_No_Landmark/ONet'],
+                        type=str)
+    """
+    parser.add_argument('--prefix', dest='prefix', help='prefix of model name', nargs="+",
+                        default=['../data/MTCNN_model/PNet_Landmark/PNet', '../data/MTCNN_model/RNet_Landmark/RNet', '../data/MTCNN_model/ONet_Landmark/ONet'],
                         type=str)
     parser.add_argument('--epoch', dest='epoch', help='epoch number of model to load', nargs="+",
                         default=[18, 14, 16], type=int)
@@ -217,19 +249,21 @@ def parse_args():
 
 if __name__ == '__main__':
 
-    net = 'ONet'
+    net = 'RNet'
 
     if net == "RNet":
         image_size = 24
     if net == "ONet":
         image_size = 48
 
-    base_dir = '../../DATA/WIDER_train'
-    data_dir = '../../DATA/no_LM%s' % str(image_size)
-    
+    base_dir = './WIDER_train'
+    data_dir = './no_LM%s' % str(image_size)
+    print("data_dir:",data_dir)
     neg_dir = get_path(data_dir, 'negative')
     pos_dir = get_path(data_dir, 'positive')
     part_dir = get_path(data_dir, 'part')
+    print("neg_dir:",neg_dir)
+    #print("end:",end)
     #create dictionary shuffle   
     for dir_path in [neg_dir, pos_dir, part_dir]:
         if not os.path.exists(dir_path):
@@ -239,8 +273,8 @@ if __name__ == '__main__':
 
     print('Called with argument:')
     print(args)
-    t_net(args.prefix,#model param's file
-          args.epoch, #final epoches
+    t_net(args.prefix,#model param's file模型参数文件
+          args.epoch, #final epoches周期数
           args.batch_size, #test batch_size 
           args.test_mode,#test which model
           args.thresh, #cls threshold

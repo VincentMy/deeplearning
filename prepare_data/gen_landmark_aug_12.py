@@ -52,6 +52,7 @@ def GenerateData(ftxt,data_path,net,argument=False):
         F_imgs = []
         F_landmarks = []
         print(imgPath)
+        #把图片转换成cv2 h*w*3格式
         img = cv2.imread(imgPath)
 
         assert(img is not None)
@@ -68,13 +69,16 @@ def GenerateData(ftxt,data_path,net,argument=False):
 
         #normalize land mark by dividing the width and height of the ground truth bounding box
         # landmakrGt is a list of tuples
+        # 计算的是坐标相对于bbox左上角坐标的偏移量，然后除以宽或高来对其进行正则化
+        # 5个关键点(x,y)都是进行过正则化的
         for index, one in enumerate(landmarkGt):
             # (( x - bbox.left)/ width of bounding box, (y - bbox.top)/ height of bounding box
             rv = ((one[0]-gt_box[0])/(gt_box[2]-gt_box[0]), (one[1]-gt_box[1])/(gt_box[3]-gt_box[1]))
             # put the normalized value into the new list landmark
             landmark[index] = rv
-        
+        #添加resize后的face
         F_imgs.append(f_face)
+        #添加图片所对应的landmark坐标信息
         F_landmarks.append(landmark.reshape(10))
         landmark = np.zeros((5, 2))        
         if argument:
@@ -111,7 +115,7 @@ def GenerateData(ftxt,data_path,net,argument=False):
 
                 #h,w,c,待剪切图片
                 cropped_im = img[ny1:ny2+1,nx1:nx2+1,:]
-                #重新resize图片
+                #重新resize图片，把剪切后的图片resize成12*12
                 resized_im = cv2.resize(cropped_im, (size, size))
                 #cal iou
                 #若a的shape为(2,3),且axis为0，则np.expand_dims(a,axis) 为(1,2,3)。同理axis为1，则为(2,1,3)
@@ -119,11 +123,16 @@ def GenerateData(ftxt,data_path,net,argument=False):
                 if iou > 0.65:
                     F_imgs.append(resized_im)
                     #normalize,其中landmarkGt为一个(5,2)的矩阵
+                    # 计算的是坐标相对于bbox左上角坐标的偏移量，然后除以宽或高来对其进行正则化
+                    # 5个关键点(x,y)都是进行过正则化的
                     for index, one in enumerate(landmarkGt):
                         rv = ((one[0]-nx1)/bbox_size, (one[1]-ny1)/bbox_size)
                         landmark[index] = rv
                     F_landmarks.append(landmark.reshape(10))
                     landmark = np.zeros((5, 2))
+                    #F_landmarks[-1]表示把原来n*10变成现在的一行，就是[[....],[......],[.....]],变成[...........]
+                    # reshape(-1,2)表示把原来的一行，变成n*2,就是由原来的[..........]变成[[..],[..],[..]]
+                    #landmark_的shape为n*2
                     landmark_ = F_landmarks[-1].reshape(-1,2)
                     bbox = BBox([nx1,ny1,nx2,ny2])                    
 
@@ -178,7 +187,7 @@ def GenerateData(ftxt,data_path,net,argument=False):
 
                 if np.sum(np.where(F_landmarks[i] >= 1, 1, 0)) > 0:
                     continue
-
+                    
                 cv2.imwrite(join(dstdir,"%d.jpg" %(image_id)), F_imgs[i])
                 landmarks = map(str,list(F_landmarks[i]))
                 f.write(join(dstdir,"%d.jpg" %(image_id))+" -2 "+" ".join(landmarks)+"\n")

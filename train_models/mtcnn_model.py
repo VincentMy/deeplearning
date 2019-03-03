@@ -165,15 +165,24 @@ def cal_accuracy(cls_prob,label):
     # get the index of maximum value along axis one from cls_prob
     # 0 for negative 1 for positive
     pred = tf.argmax(cls_prob,axis=1)
+    #label的值为1,0，-1，-2
     label_int = tf.cast(label,tf.int64)
     # return the index of pos and neg examples
+    #其中tf.greater_equal()表示大于等于
+    #tf.where(boolean)表示返回值为true的列下标
+    #表示返回pos和neg的下标
     cond = tf.where(tf.greater_equal(label_int,0))
+    #print("cond:",cond.shape)
     picked = tf.squeeze(cond)
     # gather the label of pos and neg examples
+    #获取下标为pos和neg的下标所对应的概率值
     label_picked = tf.gather(label_int,picked)
+    #返回预测值中所对应的pos和neg的下标所对应的概率值
     pred_picked = tf.gather(pred,picked)
     #calculate the mean value of a vector contains 1 and 0, 1 for correct classification, 0 for incorrect
     # ACC = (TP+FP)/total population
+    #首先使用tr.equal(a,b)判断a和b是否相等，然后使用tf.cast(boolean)方法把boolean值转换成1和0.
+    #然后通过tf.readuce_mean()方法计算平均值，即1存在的概率，也就是最后的精确值
     accuracy_op = tf.reduce_mean(tf.cast(tf.equal(label_picked,pred_picked),tf.float32))
     return accuracy_op
 
@@ -202,7 +211,7 @@ def P_Net(inputs,label=None,bbox_target=None,landmark_target=None,training=True)
     #define common param
     #提供默认值
     with slim.arg_scope([slim.conv2d],
-                        activation_fn=prelu,
+                        #activation_fn=prelu,
                         weights_initializer=slim.xavier_initializer(),
                         biases_initializer=tf.zeros_initializer(),
                         weights_regularizer=slim.l2_regularizer(0.0005), 
@@ -242,7 +251,7 @@ def P_Net(inputs,label=None,bbox_target=None,landmark_target=None,training=True)
         _activation_summary(landmark_pred)
         print (landmark_pred.get_shape())
 
-
+        #print("PNetend:",end)
         # add projectors for visualization
 
 
@@ -269,6 +278,7 @@ def P_Net(inputs,label=None,bbox_target=None,landmark_target=None,training=True)
             landmark_loss = landmark_ohem(landmark_pred,landmark_target,label)
 
             accuracy = cal_accuracy(cls_prob,label)
+            #ge_regularization_losses()表示获取整体的正则化loss，应该是给后面计算用的，提前创建出来
             L2_loss = tf.add_n(slim.losses.get_regularization_losses())
             return cls_loss,bbox_loss,landmark_loss,L2_loss,accuracy
         #test

@@ -39,28 +39,36 @@ def getDataFromTxt(txt,data_path, with_landmark=True):
             landmark: [(x1, y1), (x2, y2), ...]
     """
 
-
+    #readlines表示读取整个文件，类型为str类型
     with open(txt, 'r') as fd:
         lines = fd.readlines()
 
     result = []
+    #按行读取，类型为str
     for line in lines:
         line = line.strip()
         components = line.split(' ')
-        #获取图片路径
+        #获取图片路径 lfw_5590和net_7876路径下图片
         img_path = os.path.join(data_path, components[0]).replace('\\','/') # file path
+        #print("img_path:",img_path)
+        #print("end:",end)
 
         # bounding box, (x1, y1, x2, y2)
         #bbox = (components[1], components[2], components[3], components[4])
         #1:x1,3:y1,2:x2,4:y2
-        bbox = (components[1], components[3], components[2], components[4])        
+        bbox = (components[1], components[3], components[2], components[4])   
+        #把str转换成float     
         bbox = [float(_) for _ in bbox]
+        #把bbox转换成int类型序列,再将该序列转换为列表输出[x1,y1,x2,y2]
         bbox = list(map(int,bbox))
-        # landmark
+        #print("bbox:",bbox.shape)
+        #print("end:",end)
+        # landmark 添加图片路径和bbox坐标
         if not with_landmark:
             result.append((img_path, BBox(bbox)))
             continue
         landmark = np.zeros((5, 2))
+        #返回坐标index位5,6,7,8,9,10,11,12,13,14
         for index in range(0, 5):
             rv = (float(components[5+2*index]), float(components[5+2*index+1]))
             landmark[index] = rv
@@ -70,6 +78,7 @@ def getDataFromTxt(txt,data_path, with_landmark=True):
             rv = ((one[0]-bbox[0])/(bbox[2]-bbox[0]), (one[1]-bbox[1])/(bbox[3]-bbox[1]))
             landmark[index] = rv
         '''
+        #把图片路径、bbox坐标位置、landmark坐标位置
         result.append((img_path, BBox(bbox), landmark))
     return result
 

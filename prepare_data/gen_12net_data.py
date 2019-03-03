@@ -24,6 +24,7 @@ if not os.path.exists(neg_save_dir):
 f1 = open(os.path.join(save_dir, 'pos_12.txt'), 'w')
 f2 = open(os.path.join(save_dir, 'neg_12.txt'), 'w')
 f3 = open(os.path.join(save_dir, 'part_12.txt'), 'w')
+#wider_face_train.txt这个文件中的数据是，图片地址+bbox
 with open(anno_file, 'r') as f:
     annotations = f.readlines()
 num = len(annotations)
@@ -34,14 +35,20 @@ d_idx = 0 # don't care
 idx = 0
 box_idx = 0
 for annotation in annotations:
-    annotation = annotation.strip().split(' ')
+    annotation = annotation.strip().split(' ') #strip()表示去掉空格
     #image path
     im_path = annotation[0]
     #print(im_path)
     #boxed change to float type
+    #map(表达式，数值) 表示数值按照表达式的方式计算
+    #python3下map()函数返回的类型为iterators，不再是list
+    #map()函数返回不能直接使用
     bbox = list(map(float, annotation[1:]))
     #gt
+    #转换成数组形式
     boxes = np.array(bbox, dtype=np.float32).reshape(-1, 4)
+    #print("boxes:",boxes.shape) #boxes: (1, 4)
+    #print("end:",end)
     #load image
     img = cv2.imread(os.path.join(im_dir, im_path + '.jpg'))
     idx += 1
@@ -57,25 +64,30 @@ for annotation in annotations:
     while neg_num < 50:
         #neg_num's size [40,min(width, height) / 2],min_size:40
         # size is a random number between 12 and min(width,height)
+        # size是一个随机数
         size = npr.randint(12, min(width, height) / 2)
         #top_left coordinate
+        #当img是一个正方形时，并size=width/2，则nx和ny便为图片中心，所以size最大是min(width, height) / 2
         nx = npr.randint(0, width - size)
         ny = npr.randint(0, height - size)
-        #random crop
+        #random crop,生成随机的bbox
         crop_box = np.array([nx, ny, nx + size, ny + size])
-        #calculate iou
+        #calculate iou，计算随机生成的bbox和原图片的bbox进行IOU的计算
         Iou = IoU(crop_box, boxes)
 
         #crop a part from inital image
+        #根据生成的随机bbox，对原始图片进行裁剪
         cropped_im = img[ny : ny + size, nx : nx + size, :]
         #resize the cropped image to size 12*12
+        #把裁剪后的图片进行缩放，缩放到12*12
         resized_im = cv2.resize(cropped_im, (12, 12), interpolation=cv2.INTER_LINEAR)
 
-
+        #把Iou<0.3的剪切后的图片信息进行保存，包括剪切后的图片和剪切后的图片地址，分别保存在不同的路径下
         if np.max(Iou) < 0.3:
             # Iou with all gts must below 0.3
             save_file = os.path.join(neg_save_dir, "%s.jpg"%n_idx)
             f2.write("../../DATA/12/negative/%s.jpg"%n_idx + ' 0\n')
+            #print("end:",end)
             cv2.imwrite(save_file, resized_im)
             n_idx += 1
             neg_num += 1
@@ -85,6 +97,7 @@ for annotation in annotations:
     for box in boxes:
         # box (x_left, y_top, x_right, y_bottom)
         x1, y1, x2, y2 = box
+        #print("coordinate:",x1,y1)
         #gt's width
         w = x2 - x1 + 1
         #gt's height
@@ -99,6 +112,7 @@ for annotation in annotations:
         # crop another 5 images near the bounding box if IoU less than 0.5, save as negative samples
         for i in range(5):
             #size of the image to be cropped
+            # 随机生成bbox的size
             size = npr.randint(12, min(width, height) / 2)
             # delta_x and delta_y are offsets of (x1, y1)
             # max can make sure if the delta is a negative number , x1+delta_x >0

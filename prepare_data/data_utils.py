@@ -23,16 +23,22 @@ def read_annotation(base_dir, label_path):
     data = dict()
     images = []
     bboxes = []
+    #print("label_path:",label_path)
+    #print("end:",end)
     labelfile = open(label_path, 'r')
     while True:
         # image path
         imagepath = labelfile.readline().strip('\n')
+        #print("imagepath:",imagepath)
         if not imagepath:
             break
+        #获取图片路径
         imagepath = base_dir + '/WIDER_train/images/' + imagepath
         images.append(imagepath)
-        # face numbers
+        # face numbers，第二行，表示face的数量
         nums = labelfile.readline().strip('\n')
+        #print("nums:",nums)
+        #print("end:",end)
         # im = cv2.imread(imagepath)
         # h, w, c = im.shape
         one_image_bboxes = []
@@ -43,6 +49,7 @@ def read_annotation(base_dir, label_path):
             # only need x, y, w, h
             face_box = [float(bb_info[i]) for i in range(4)]
             # text = text + ' ' + str(face_box[0] / w) + ' ' + str(face_box[1] / h)
+            # 表示boundingbox的坐标位置
             xmin = face_box[0]
             ymin = face_box[1]
             xmax = xmin + face_box[2]
@@ -134,8 +141,8 @@ def IoU(box, bboxes):
 
 
 if __name__ == '__main__':
-    dir = '/media/thinkjoy/新加卷/dataset/widerface/wider_face_split/wider_face_train_bbx_gt.txt'
-    base_dir = '/media/thinkjoy/新加卷/dataset/widerface'
+    dir = './wider_face_train_bbx_gt.txt'
+    base_dir = './widerface'
     data = read_annotation(base_dir, dir)
     print('\n')
     print(data['images'])
