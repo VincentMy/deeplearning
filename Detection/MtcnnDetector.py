@@ -197,7 +197,7 @@ class MtcnnDetector(object):
             tmph, tmpw: numpy array, n x 1
                 height and width of the bbox
         """
-        #预测框的宽和高
+        #所有预测框的宽和高
         tmpw, tmph = bboxes[:, 2] - bboxes[:, 0] + 1, bboxes[:, 3] - bboxes[:, 1] + 1
         #返回bbox的个数
         num_box = bboxes.shape[0]
@@ -372,18 +372,25 @@ class MtcnnDetector(object):
         num_boxes = dets.shape[0]
         cropped_ims = np.zeros((num_boxes, 24, 24, 3), dtype=np.float32)
         #遍历图片，将bbox找出来并resize成24*24
+        #其中cv2.resize(tmp,(24,24))-127.5)/128表示的是对图像进行正则化到(-1,1)
         for i in range(num_boxes):
+            #定义个预测框大小的矩阵
             tmp = np.zeros((tmph[i], tmpw[i], 3), dtype=np.uint8)
+            #截取原始图像中的bbox大小的矩阵
             tmp[dy[i]:edy[i] + 1, dx[i]:edx[i] + 1, :] = im[y[i]:ey[i] + 1, x[i]:ex[i] + 1, :]
+            #对截取后的图像进行resize和正则化
             cropped_ims[i, :, :, :] = (cv2.resize(tmp, (24, 24)) - 127.5) / 128
         # cls_scores : num_data*2
         # reg: num_data*4
         # landmark: num_data*10
         #print("cropped_ims:",cropped_ims.shape) #cropped_ims: (2596, 24, 24, 3)
         #print("end:",end)
+        #把24*24*3的图像放入rnet中取训练，获得预测框的置信度和bbox
         cls_scores, reg, _ = self.rnet_detector.predict(cropped_ims)
         cls_scores = cls_scores[:, 1]
+        #因为cls_scores只有一列，所以只返回[0],表示cls_scores>threads[1]的所有行下标
         keep_inds = np.where(cls_scores > self.thresh[1])[0]
+        #把筛选出来的下标，得到筛选后的置信度和其bbox的坐标
         if len(keep_inds) > 0:
             boxes = dets[keep_inds]
             boxes[:, 4] = cls_scores[keep_inds]
@@ -391,7 +398,7 @@ class MtcnnDetector(object):
             # landmark = landmark[keep_inds]
         else:
             return None, None, None
-
+        #计算nms，
         keep = py_nms(boxes, 0.6)
         boxes = boxes[keep]
         boxes_c = self.calibrate_box(boxes, reg[keep])

@@ -116,6 +116,7 @@ def train(net_factory, prefix, end_epoch, base_dir,
     #net = PNet
     net = prefix.split('/')[-1]
     #label file
+    #读取train_PNet_landmark.txt文件，文件中保存了截取后的图片路径，标签，bbox,landmark
     label_file = os.path.join(base_dir,'train_%s_landmark.txt' % net)
     #label_file = os.path.join(base_dir,'landmark_12_few.txt')
     #print(label_file)
@@ -142,7 +143,9 @@ def train(net_factory, prefix, end_epoch, base_dir,
         #landmark_dir = os.path.join(base_dir,'landmark_landmark.tfrecord_shuffle')
         landmark_dir = os.path.join('../../DATA/imglists/RNet','landmark_landmark.tfrecord_shuffle')
         dataset_dirs = [pos_dir,part_dir,neg_dir,landmark_dir]
+        #每个指标的权重
         pos_radio = 1.0/6;part_radio = 1.0/6;landmark_radio=1.0/6;neg_radio=3.0/6
+        #np.ceil(a)表示计算大于等于该值的最小整数
         pos_batch_size = int(np.ceil(config.BATCH_SIZE*pos_radio))
         assert pos_batch_size != 0,"Batch Size Error "
         part_batch_size = int(np.ceil(config.BATCH_SIZE*part_radio))
@@ -153,6 +156,9 @@ def train(net_factory, prefix, end_epoch, base_dir,
         assert landmark_batch_size != 0,"Batch Size Error "
         batch_sizes = [pos_batch_size,part_batch_size,neg_batch_size,landmark_batch_size]
         #print('batch_size is:', batch_sizes)
+        #按照batch的不同，分别读取pos,neg,part,landmark所在tfrecord中的数据。
+        #并按照image,label,bbox,landmark分别拼接所读取的pos,neg,part,landmark的数据
+        #也就是说，image_batch中分别包含其batch数量的pos,neg,part,landmark的数据
         image_batch, label_batch, bbox_batch,landmark_batch = read_multi_tfrecords(dataset_dirs,batch_sizes, net)        
         
     #landmark_dir    
@@ -172,6 +178,7 @@ def train(net_factory, prefix, end_epoch, base_dir,
     bbox_target = tf.placeholder(tf.float32, shape=[config.BATCH_SIZE, 4], name='bbox_target')
     landmark_target = tf.placeholder(tf.float32,shape=[config.BATCH_SIZE,10],name='landmark_target')
     #get loss and accuracy
+    #对图片进行色彩调整
     input_image = image_color_distort(input_image)
     #此处返回的是PNET中分类损失函数，bounding box的损失函数，面部5个坐标点的损失函数，整体正则化loss函数，pos和neg分类的准确性
     cls_loss_op,bbox_loss_op,landmark_loss_op,L2_loss_op,accuracy_op= net_factory(input_image, label, bbox_target,landmark_target,training=True)
@@ -191,20 +198,29 @@ def train(net_factory, prefix, end_epoch, base_dir,
     #save model
     #max_to_keep=0表示每训练一代(epoch)就保存一次模型
     saver = tf.train.Saver(max_to_keep=0)
+    """
+    tf.summary保存
+    """
     sess.run(init)
 
     #visualize some variables
+    #使用Tensorbroad可视化这些数据的变化
     tf.summary.scalar("cls_loss",cls_loss_op)#cls_loss
     tf.summary.scalar("bbox_loss",bbox_loss_op)#bbox_loss
     tf.summary.scalar("landmark_loss",landmark_loss_op)#landmark_loss
     tf.summary.scalar("cls_accuracy",accuracy_op)#cls_acc
     tf.summary.scalar("total_loss",total_loss_op)#cls_loss, bbox loss, landmark loss and L2 loss add together
+    #保存所有的summary
     summary_op = tf.summary.merge_all()
+    #保存目录的创建
     logs_dir = "../logs/%s" %(net)
     if os.path.exists(logs_dir) == False:
         os.mkdir(logs_dir)
-    #定义日志文件writer
+    #定义日志文件writer，将文件写入目录
     writer = tf.summary.FileWriter(logs_dir,sess.graph)
+    """
+    tf.summary保存
+    """
     #ProjectorConfig帮助生成日志文件
     projector_config = projector.ProjectorConfig()
     #将projector的内容写入日志文件
@@ -253,10 +269,11 @@ def train(net_factory, prefix, end_epoch, base_dir,
                 datetime.now(), step+1,MAX_STEP, acc, cls_loss, bbox_loss,landmark_loss, L2_loss,total_loss, lr))
 
 
-            #save every two epochs
+            #save every two epochs ，每两个周期保存一次
             if i * config.BATCH_SIZE > num*2:
                 epoch = epoch + 1
                 i = 0
+                #prefix表示保存的文件名，global_step表示把训练次数作为后缀加入到模型名字中
                 path_prefix = saver.save(sess, prefix, global_step=epoch*2)
                 print('path prefix is :', path_prefix)
             writer.add_summary(summary,global_step=step)

@@ -19,6 +19,9 @@ from utils import *
 from data_utils import *
 #net : 24(RNet)/48(ONet)
 #data: dict()
+#此方法主要是截取人脸部分的图片，并把截取后的图片reize到24*24，并保存
+#保存截取后的图片路径和标签，neg:0,part:-1,pos:1
+#其中part和pos还需要保存bbox信息，bbox表示的是预测值相对于gt的偏差，并除以widt或height，正则化
 def save_hard_example(net, data,save_path):
     # load ground truth from annotation file
     # format of each line: image/path [x1,y1,x2,y2] for each gt_box in this image

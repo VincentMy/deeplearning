@@ -44,6 +44,8 @@ def run(dataset_dir, net, output_dir, name='MTCNN', shuffling=False):
     
     #tfrecord name 
     tf_filename = _get_output_filename(output_dir, name, net)
+    #print("tf_filename:",tf_filename)#tf_filename: ../../DATA/imglists_noLM/RNet/landmark_landmark.tfrecord
+    #print("end:",end)
     if tf.gfile.Exists(tf_filename):
         print('Dataset files already exist. Exiting without re-creating them.')
         return
@@ -80,7 +82,7 @@ def get_dataset(dir, name, net='PNet'):
     #item = 'imglists/PNet/train_%s_raw.txt' % net
     #item = 'imglists/PNet/train_%s_landmark.txt' % net
     item = '%s/%s_24.txt' % (net,name)
-
+    #print("item:",item)#item: no_LM24/landmark_24.txt
     dataset_dir = os.path.join(dir, item)
     print('dataset dir is :', dataset_dir)
     imagelist = open(dataset_dir, 'r')
@@ -135,5 +137,5 @@ if __name__ == '__main__':
     output_directory = '../../DATA/imglists_noLM/RNet'
     if not os.path.exists(output_directory):
         os.makedirs(output_directory)
-    name = 'part'
+    name = 'landmark'
     run(dir, net, output_directory,name, shuffling=True)

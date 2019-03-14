@@ -23,14 +23,17 @@ def dense_to_one_hot(labels_dense,num_classes):
 
 def cls_ohem(cls_prob, label):
 
+    #cls_prob=[batch_size,2]
+    #lable = [batch_size]
     #生成一个label大小的0矩阵
     zeros = tf.zeros_like(label)
     #label=-1 --> label=0net_factory
 
     #pos -> 1, neg -> 0, others -> 0
-    #当tf.less(label,0)为ture时，返回zeros，否则,返回label
+    #当tf.less(label,0)为ture时，返回zeros，否则,返回label,即为[1 0 1 1 0 0 .....]
     label_filter_invalid = tf.where(tf.less(label,0), zeros, label)
     num_cls_prob = tf.size(cls_prob)
+    #把原来的batch_size行2列转换成batch_size*2行1列，相当于把预测值平铺
     cls_prob_reshape = tf.reshape(cls_prob,[num_cls_prob,-1])
     label_int = tf.cast(label_filter_invalid,tf.int32)
     # get the number of rows of class_prob
@@ -42,7 +45,7 @@ def cls_ohem(cls_prob, label):
     #tf.gather(a,b)表示a按照b的索引顺序排列
     #此处的tf.gather()表示cls_prob_reshape按照indices_索引取数，分别取出对应的概率
     #表示正确分类的概率值
-    #label_prob.shape = (384) ,其中每一位数，代表了其正确分类的概率
+    #label_prob.shape = (384) ,其中每一位数，代表了其正确分类的概率,，单数表示pos的概率，双数表示neg的概率
     label_prob = tf.squeeze(tf.gather(cls_prob_reshape, indices_))
     #-tf.log(label_prob)表示的是log(p),其中的1e-10代表了10^(-10)=0.0000000001。主要是为了防止为0
     loss = -tf.log(label_prob+1e-10)
@@ -59,7 +62,7 @@ def cls_ohem(cls_prob, label):
     #num_keep_radio=0.7
     keep_num = tf.cast(num_valid*num_keep_radio,dtype=tf.int32)
     #FILTER OUT PART AND LANDMARK DATA
-    #这个交叉熵损失函数所用的事例是正例和负例，其他事例因为label所对应的值为0，所以不影响计算
+    #这个交叉熵损失函数所用的事例是正例和负例，其他事例因为label所对应的值为0，所以不影响计算，即pos的loss乘以1，neg的loss乘以1，其他的loss乘以0
     loss = loss * valid_inds
     #tf.nn.top_k(a,k)如果a是一维：表示返回a中前k个最大值，如果a是多维：表示返回每一行中的前k个最大值
     #此处表示返回前70%的损失函值
@@ -108,6 +111,9 @@ def bbox_ohem(bbox_pred,bbox_target,label):
     :return: mean euclidean loss for all the pos and part examples
     '''
     #label.shape = (384,)
+    #bbox_pred = [batch_size,4]
+    #bbox_target = [batch_size,4]
+    #label = [batch_size]
     zeros_index = tf.zeros_like(label, dtype=tf.float32)
     ones_index = tf.ones_like(label,dtype=tf.float32)
     # keep pos and part examples
@@ -142,16 +148,26 @@ def landmark_ohem(landmark_pred,landmark_target,label):
     :return: mean euclidean loss
     '''
     #keep label =-2  then do landmark detection
+    #landmark_pred = [batch_size,10]
+    #landmark_target = [batch_size,10]
+    #label = [batch_size]
     ones = tf.ones_like(label,dtype=tf.float32)
     zeros = tf.zeros_like(label,dtype=tf.float32)
+    #-2表示的是landmark
     valid_inds = tf.where(tf.equal(label,-2),ones,zeros)
+    #返回的就是一个[BATCH_SIZE,10]的数组，其中每个值都是减后平方的结果
     square_error = tf.square(landmark_pred-landmark_target)
+    #表示每一行的所有值相加，即10个landmark的坐标误差的加和
     square_error = tf.reduce_sum(square_error,axis=1)
+    #验证集的总数量
     num_valid = tf.reduce_sum(valid_inds)
     #keep_num = tf.cast(num_valid*num_keep_radio,dtype=tf.int32)
     keep_num = tf.cast(num_valid, dtype=tf.int32)
+    #只保留label是-2的数据，数据为square_error(每一行所有误差的平方和)。其他标签的数据为0，类似于[1.6531092 1.9187249 0.        0.        2.4839485 0.        1.6831231]这种数据形式
     square_error = square_error*valid_inds
+    #tf.nn.top_k返回一个key,value形式的数据，_,表示了前keep_num大的具体的数值，k_index表示其坐标
     _, k_index = tf.nn.top_k(square_error, k=keep_num)
+    #返回前keep_num大的square_error的值，其值为具体的误差平方和，类似于：[2.8851743 2.5473971 1.98878 ...... ]
     square_error = tf.gather(square_error, k_index)
     return tf.reduce_mean(square_error)
     
@@ -164,6 +180,7 @@ def cal_accuracy(cls_prob,label):
     '''
     # get the index of maximum value along axis one from cls_prob
     # 0 for negative 1 for positive
+    #获取每一行中最大概率的坐标，例如：[0 1 1 0 1 .....]
     pred = tf.argmax(cls_prob,axis=1)
     #label的值为1,0，-1，-2
     label_int = tf.cast(label,tf.int64)
@@ -173,6 +190,7 @@ def cal_accuracy(cls_prob,label):
     #表示返回pos和neg的下标
     cond = tf.where(tf.greater_equal(label_int,0))
     #print("cond:",cond.shape)
+    #把原来的[size,1]的数组，squeeze成[size]的数组,就是去掉为1的列
     picked = tf.squeeze(cond)
     # gather the label of pos and neg examples
     #获取下标为pos和neg的下标所对应的概率值
@@ -332,6 +350,8 @@ def R_Net(inputs,label=None,bbox_target=None,landmark_target=None,training=True)
             return cls_prob,bbox_pred,landmark_pred
     
 def O_Net(inputs,label=None,bbox_target=None,landmark_target=None,training=True):
+    #提供一个新的作用域（scope），称为arg_scope，在该作用域（scope）中，用户可以定义一些默认的参数，用于特定的操作
+    #默认值，表示在没有声明的情况下使用默认值，如果有声明，则被覆盖
     with slim.arg_scope([slim.conv2d],
                         activation_fn = prelu,
                         weights_initializer=slim.xavier_initializer(),
@@ -353,8 +373,10 @@ def O_Net(inputs,label=None,bbox_target=None,landmark_target=None,training=True)
         print(net.get_shape())
         net = slim.conv2d(net,num_outputs=128,kernel_size=[2,2],stride=1,scope="conv4")
         print(net.get_shape())
+        #net 3*3*128
         fc_flatten = slim.flatten(net)
         print(fc_flatten.get_shape())
+        #1*1*256
         fc1 = slim.fully_connected(fc_flatten, num_outputs=256,scope="fc1")
         print(fc1.get_shape())
         #batch*2
@@ -371,6 +393,7 @@ def O_Net(inputs,label=None,bbox_target=None,landmark_target=None,training=True)
             cls_loss = cls_ohem(cls_prob,label)
             bbox_loss = bbox_ohem(bbox_pred,bbox_target,label)
             accuracy = cal_accuracy(cls_prob,label)
+            #标签为-2的数据集数有num,则返回num数量的landmark的误差的平方和，每个平方和表示每行中10个landmark坐标的预测值和target值得差值的平方和
             landmark_loss = landmark_ohem(landmark_pred, landmark_target,label)
             L2_loss = tf.add_n(slim.losses.get_regularization_losses())
             return cls_loss,bbox_loss,landmark_loss,L2_loss,accuracy

@@ -49,7 +49,11 @@ def getDataFromTxt(txt,data_path, with_landmark=True):
         line = line.strip()
         components = line.split(' ')
         #获取图片路径 lfw_5590和net_7876路径下图片
+        #print("components:",components[0]) #lfw_5590\Aaron_Eckhart_0001.jpg
+        #print("end:",end)
         img_path = os.path.join(data_path, components[0]).replace('\\','/') # file path
+        #print("img_path:",img_path) #img_path: ./lfw_5590/Aaron_Eckhart_0001.jpg
+        #print("end:",end)
         #print("img_path:",img_path)
         #print("end:",end)
 
@@ -69,6 +73,8 @@ def getDataFromTxt(txt,data_path, with_landmark=True):
             continue
         landmark = np.zeros((5, 2))
         #返回坐标index位5,6,7,8,9,10,11,12,13,14
+        #range(0,5) 表示的是0,1,2,3,4
+        #返回的是一个(5,2)的数组
         for index in range(0, 5):
             rv = (float(components[5+2*index]), float(components[5+2*index+1]))
             landmark[index] = rv

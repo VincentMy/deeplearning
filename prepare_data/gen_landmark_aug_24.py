@@ -73,6 +73,7 @@ def GenerateData(ftxt, output,net,argument=False):
         assert(img is not None)
         img_h,img_w,img_c = img.shape
         gt_box = np.array([bbox.left,bbox.top,bbox.right,bbox.bottom])
+        #截取原图中人脸部分
         f_face = img[bbox.top:bbox.bottom+1,bbox.left:bbox.right+1]
         #cv2.imshow("image",f_face)
         #cv2.waitKey(0)
@@ -87,10 +88,12 @@ def GenerateData(ftxt, output,net,argument=False):
             #print("gt_box:",gt_box[0])
             #print("end:",end)
             #(one[0]-x1)/(x2-x1),(one[1]-y1)/(y2-y1)
+            #每个landmark坐标点，相对于左上角坐标的offset，然后对这个offset进行归一化的结果
             rv = ((one[0]-gt_box[0])/(gt_box[2]-gt_box[0]), (one[1]-gt_box[1])/(gt_box[3]-gt_box[1]))
             landmark[index] = rv
         
         F_imgs.append(f_face)
+        #把landmark由原来的(5,2)转换成(1,10)
         F_landmarks.append(landmark.reshape(10))
         landmark = np.zeros((5, 2))
         #print("argument:",argument)#argument: True

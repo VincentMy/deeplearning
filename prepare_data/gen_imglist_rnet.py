@@ -16,7 +16,7 @@ elif size == 24:
 elif size == 48:
     net = "ONet"
 
-
+#此地址是gen_hard_example.py生成的，其中保存了图像的path、标签和bbox。其中bbox是归一化后的结果
 with open(os.path.join(data_dir, '%s/pos_%s.txt' % (dir_name, size)), 'r') as f:
     pos = f.readlines()
 
